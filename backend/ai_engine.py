@@ -7,23 +7,81 @@ from pathlib import Path
 from logger import get_logger
 from config import settings
 import numpy as np
+import requests
 
 logger = get_logger(__name__)
 
 class VLMExtractor:
-    def __init__(self, model_name: str = "qwen-vl"):
-        self.model_name = model_name
-        self.is_mock = True
-        logger.info(f"Initializing VLM: {model_name}")
-    
+    def __init__(self, model_name: str = None):
+        self.model_name = model_name or settings.vlm_model
+        self.api_key = settings.nvidia_nim_api_key
+        self.base_url = settings.nvidia_nim_base_url
+        logger.info(f"Initializing VLM: {self.model_name}")
+
+        if not self.api_key:
+            logger.warning("NVIDIA_NIM_API_KEY not set, VLM extraction will not work")
+
     def extract_text(self, image_path: str) -> str:
         try:
-            if self.is_mock:
+            if not self.api_key:
                 return self._extract_text_mock(image_path)
+
+            with open(image_path, "rb") as img_file:
+                image_data = base64.standard_b64encode(img_file.read()).decode("utf-8")
+
+            return self._extract_text_nvidia(image_data)
         except Exception as e:
             logger.error(f"Error extracting text from {image_path}: {e}")
             return f"[Error extracting text: {str(e)}]"
-    
+
+    def _extract_text_nvidia(self, image_data: str) -> str:
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": self.model_name,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_data}"
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": "Extract all text from this exam answer image. Be precise and complete."
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 2048
+            }
+
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                extracted_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                logger.info(f"Successfully extracted text using NVIDIA NIM VLM")
+                return extracted_text
+            else:
+                logger.error(f"NVIDIA NIM API error: {response.status_code} - {response.text}")
+                return self._extract_text_mock(image_path)
+        except Exception as e:
+            logger.error(f"Error calling NVIDIA NIM VLM: {e}")
+            return self._extract_text_mock(image_path)
+
     def _extract_text_mock(self, image_path: str) -> str:
         logger.info(f"Using mock VLM for {image_path}")
         return "Mock extracted text: The student provided a comprehensive answer demonstrating understanding of the core concepts."
@@ -33,48 +91,145 @@ class GradingAgent:
     def __init__(self):
         logger.info("Initializing Grading Agent")
         self.vlm = VLMExtractor(model_name=settings.vlm_model)
-    
+        self.api_key = settings.nvidia_nim_api_key
+        self.base_url = settings.nvidia_nim_base_url
+
+        if not self.api_key:
+            logger.warning("NVIDIA_NIM_API_KEY not set, grading will use basic evaluation")
+
     def grade_answer(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            if self.api_key:
+                return self._grade_with_nvidia(extracted_text, rubric)
+            else:
+                return self._grade_basic(extracted_text, rubric)
+        except Exception as e:
+            logger.error(f"Error grading answer: {e}")
+            return {
+                "score": 0,
+                "max_score": rubric.get("max_score", 5.0),
+                "justification": {"error": str(e)},
+                "success": False
+            }
+
+    def _grade_with_nvidia(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
         try:
             criteria = rubric.get("criteria", {})
             max_score = rubric.get("max_score", 5.0)
-            
+            question = rubric.get("question_number", "Unknown")
+
+            prompt = f"""You are an expert exam grader. Grade the following student answer according to the rubric.
+
+Question: {question}
+Student Answer: {extracted_text}
+
+Rubric Criteria:
+"""
+            for criterion_key, criterion in criteria.items():
+                condition = criterion.get("condition", "")
+                points = criterion.get("points", 0)
+                prompt += f"\n- {condition} ({points} points)"
+
+            prompt += f"\n\nRespond in JSON format with:"
+            prompt += "\n{\"score\": <total_score>, \"justification\": {{\"criterion_1\": {{\"met\": true/false, \"explanation\": \"...\"}}, ...}}, \"feedback\": \"...\"}"
+
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": settings.llm_model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.3,
+                "max_tokens": 1024
+            }
+
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+                try:
+                    grade_data = json.loads(response_text)
+                    score = min(grade_data.get("score", 0), max_score)
+
+                    justification = {}
+                    for i, (criterion_key, criterion) in enumerate(criteria.items(), 1):
+                        criterion_data = grade_data.get("justification", {}).get(f"criterion_{i}", {})
+                        justification[f"criterion_{i}"] = {
+                            "condition": criterion.get("condition", ""),
+                            "met": criterion_data.get("met", False),
+                            "score_awarded": criterion.get("points", 0) if criterion_data.get("met") else 0,
+                            "explanation": criterion_data.get("explanation", "")
+                        }
+
+                    return {
+                        "score": score,
+                        "max_score": max_score,
+                        "justification": justification,
+                        "feedback": grade_data.get("feedback", ""),
+                        "success": True
+                    }
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse NVIDIA NIM response as JSON, falling back to basic grading")
+                    return self._grade_basic(extracted_text, rubric)
+            else:
+                logger.error(f"NVIDIA NIM API error: {response.status_code} - {response.text}")
+                return self._grade_basic(extracted_text, rubric)
+        except Exception as e:
+            logger.error(f"Error grading with NVIDIA NIM: {e}")
+            return self._grade_basic(extracted_text, rubric)
+
+    def _grade_basic(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            criteria = rubric.get("criteria", {})
+            max_score = rubric.get("max_score", 5.0)
+
             justification = {}
             total_score = 0.0
-            
+
             for i, (criterion_key, criterion) in enumerate(criteria.items(), 1):
                 condition = criterion.get("condition", "")
                 points = criterion.get("points", 0)
-                
+
                 met = self._evaluate_condition(condition, extracted_text)
-                
+
                 justification[f"criterion_{i}"] = {
                     "condition": condition,
                     "met": met,
                     "score_awarded": points if met else 0,
                     "explanation": f"Criterion: {condition} - {'Met' if met else 'Not met'}"
                 }
-                
+
                 if met:
                     total_score += points
-            
+
             total_score = min(total_score, max_score)
-            
-            justification["summary"] = {
-                "total_score": total_score,
-                "max_score": max_score,
-                "percentage": round((total_score / max_score * 100) if max_score > 0 else 0, 1),
-                "feedback": self._generate_feedback(justification, total_score, max_score)
-            }
-            
+
+            percentage = round((total_score / max_score * 100) if max_score > 0 else 0, 1)
+            feedback = self._generate_feedback(justification, total_score, max_score)
+
             return {
                 "score": total_score,
                 "max_score": max_score,
                 "justification": justification,
+                "feedback": feedback,
                 "success": True
             }
         except Exception as e:
-            logger.error(f"Error grading answer: {e}")
+            logger.error(f"Error in basic grading: {e}")
             return {
                 "score": 0,
                 "max_score": rubric.get("max_score", 5.0),

@@ -54,7 +54,7 @@ npm run dev
 - **SQLAlchemy**: ORM for database management
 - **Pydantic**: Data validation and settings
 - **PyMuPDF**: PDF processing and image extraction
-- **LangChain/LangGraph**: Agentic LLM workflows
+- **NVIDIA NIM**: Cloud-based VLM and LLM inference
 - **Sentence-Transformers**: Semantic similarity for plagiarism detection
 
 ### Frontend Stack
@@ -114,11 +114,31 @@ Create `.env` in the backend directory:
 DATABASE_URL=sqlite:///./gradeops.db
 DEBUG=true
 API_TITLE=GRADEOPS API
-VLM_MODEL=qwen-vl
-LLM_MODEL=gpt-4
+
+# NVIDIA NIM Configuration
+NVIDIA_NIM_API_KEY=your-api-key-here
+VLM_MODEL=nvidia/llama-32-vision
+LLM_MODEL=nvidia/llama-3.1-70b-instruct
+
 SIMILARITY_THRESHOLD=0.85
 LOG_LEVEL=INFO
 ```
+
+### Getting NVIDIA NIM API Key
+1. Visit [NVIDIA Cloud Console](https://console.cloud.nvidia.com)
+2. Create or sign in to your account
+3. Navigate to API Keys section
+4. Generate a new API key for NVIDIA NIM
+5. Add it to your `.env` file as `NVIDIA_NIM_API_KEY`
+
+### Available NVIDIA NIM Models
+- **VLM Models** (Vision-Language for text extraction):
+  - `nvidia/llama-32-vision` - Recommended for exam document analysis
+  
+- **LLM Models** (Language models for grading logic):
+  - `nvidia/llama-3.1-70b-instruct` - Recommended for exam grading
+  - `nvidia/mistral-large` - Alternative option
+  - `nvidia/nemotron-4-340b-instruct` - High accuracy option
 
 ## Database Schema
 
