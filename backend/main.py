@@ -18,6 +18,22 @@ logger = get_logger(__name__)
 
 models.Base.metadata.create_all(bind=engine)
 
+def init_default_user():
+    db = database.SessionLocal()
+    try:
+        existing_user = db.query(models.User).filter(models.User.id == 1).first()
+        if not existing_user:
+            default_user = models.User(id=1, username="instructor", role="instructor")
+            db.add(default_user)
+            db.commit()
+            logger.info("Created default instructor user")
+    except Exception as e:
+        logger.error(f"Error creating default user: {e}")
+    finally:
+        db.close()
+
+init_default_user()
+
 os.makedirs(settings.upload_dir, exist_ok=True)
 os.makedirs(settings.artifacts_dir, exist_ok=True)
 
