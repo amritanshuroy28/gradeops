@@ -12,7 +12,7 @@ export default function UploadPortal() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!rubricFile) {
       setStatus('Error: Please select a rubric JSON file');
       return;
@@ -30,7 +30,13 @@ export default function UploadPortal() {
 
       // Parse rubric JSON
       const rubricText = await rubricFile.text();
-      const rubricData = JSON.parse(rubricText);
+      let rubricData;
+      try {
+        rubricData = JSON.parse(rubricText);
+      } catch (e) {
+        setStatus('Error: Invalid JSON in rubric file');
+        return;
+      }
 
       // Create course
       const courseRes = await fetch(`${BACKEND_URL}/config/course/`, {
@@ -38,7 +44,16 @@ export default function UploadPortal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: courseTitle, instructor_id: 1 })
       });
+      if (!courseRes.ok) {
+        const error = await courseRes.text();
+        setStatus(`Error creating course: ${error || courseRes.statusText}`);
+        return;
+      }
       const course = await courseRes.json();
+      if (!course?.id) {
+        setStatus('Error: Invalid course response from server');
+        return;
+      }
 
       // Create exam
       const examRes = await fetch(`${BACKEND_URL}/config/exam/`, {
@@ -46,10 +61,19 @@ export default function UploadPortal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: examTitle, course_id: course.id })
       });
+      if (!examRes.ok) {
+        const error = await examRes.text();
+        setStatus(`Error creating exam: ${error || examRes.statusText}`);
+        return;
+      }
       const exam = await examRes.json();
+      if (!exam?.id) {
+        setStatus('Error: Invalid exam response from server');
+        return;
+      }
 
       // Upload rubric criteria
-      await fetch(`${BACKEND_URL}/config/rubric/`, {
+      const rubricRes = await fetch(`${BACKEND_URL}/config/rubric/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -59,21 +83,33 @@ export default function UploadPortal() {
           criteria: rubricData.criteria || rubricData
         })
       });
+      if (!rubricRes.ok) {
+        const error = await rubricRes.text();
+        setStatus(`Error uploading rubric: ${error || rubricRes.statusText}`);
+        return;
+      }
 
       // Upload exam PDFs
+      let uploadedCount = 0;
       for (const file of examFiles) {
         const formData = new FormData();
         formData.append('exam_id', exam.id.toString());
         formData.append('student_id', `S${Math.floor(Math.random() * 10000)}`);
         formData.append('file', file);
 
-        await fetch(`${BACKEND_URL}/upload/submission/`, {
+        const submitRes = await fetch(`${BACKEND_URL}/upload/submission/`, {
           method: 'POST',
           body: formData
         });
+        if (!submitRes.ok) {
+          const error = await submitRes.text();
+          setStatus(`Error uploading ${file.name}: ${error || submitRes.statusText}`);
+          return;
+        }
+        uploadedCount++;
       }
 
-      setStatus(`Success! Uploaded ${examFiles.length} exam(s) with rubric. Grading in progress.`);
+      setStatus(`Success! Uploaded ${uploadedCount} exam(s) with rubric. Grading in progress.`);
       setCourseTitle('');
       setExamTitle('');
       setRubricFile(null);
@@ -81,7 +117,7 @@ export default function UploadPortal() {
       if (rubricRef.current) rubricRef.current.value = '';
       if (examRef.current) examRef.current.value = '';
     } catch (error) {
-      setStatus('Error: ' + String(error));
+      setStatus('Error: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setUploading(false);
     }
