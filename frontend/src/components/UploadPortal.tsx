@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 
 interface RubricCriterion {
   id: string;
@@ -13,7 +13,6 @@ export default function UploadPortal() {
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addRubric = () => {
@@ -45,7 +44,6 @@ export default function UploadPortal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: examTitle, course_id: course.id })
       });
-      const exam = await examRes.json();
 
       setStatus('Upload successful! Grading in progress.');
     } catch (error) {
