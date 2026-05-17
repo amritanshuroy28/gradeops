@@ -26,12 +26,14 @@ export default function UploadPortal() {
     setUploading(true);
 
     try {
+      const BACKEND_URL = 'https://gradeops-backend.onrender.com';
+
       // Parse rubric JSON
       const rubricText = await rubricFile.text();
       const rubricData = JSON.parse(rubricText);
 
       // Create course
-      const courseRes = await fetch('http://localhost:8000/config/course/', {
+      const courseRes = await fetch(`${BACKEND_URL}/config/course/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: courseTitle, instructor_id: 1 })
@@ -39,7 +41,7 @@ export default function UploadPortal() {
       const course = await courseRes.json();
 
       // Create exam
-      const examRes = await fetch('http://localhost:8000/config/exam/', {
+      const examRes = await fetch(`${BACKEND_URL}/config/exam/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: examTitle, course_id: course.id })
@@ -47,7 +49,7 @@ export default function UploadPortal() {
       const exam = await examRes.json();
 
       // Upload rubric criteria
-      await fetch('http://localhost:8000/config/rubric/', {
+      await fetch(`${BACKEND_URL}/config/rubric/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -65,7 +67,7 @@ export default function UploadPortal() {
         formData.append('student_id', `S${Math.floor(Math.random() * 10000)}`);
         formData.append('file', file);
 
-        await fetch('http://localhost:8000/upload/submission/', {
+        await fetch(`${BACKEND_URL}/upload/submission/`, {
           method: 'POST',
           body: formData
         });
