@@ -1,37 +1,36 @@
 import { useState, useRef } from 'react';
 
-interface RubricCriterion {
-  id: string;
-  condition: string;
-  points: number;
-}
-
 export default function UploadPortal() {
   const [courseTitle, setCourseTitle] = useState('');
   const [examTitle, setExamTitle] = useState('');
-  const [rubrics, setRubrics] = useState<RubricCriterion[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
+  const [rubricFile, setRubricFile] = useState<File | null>(null);
+  const [examFiles, setExamFiles] = useState<File[]>([]);
   const [status, setStatus] = useState('');
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const addRubric = () => {
-    setRubrics(prev => [...prev, { id: crypto.randomUUID(), condition: '', points: 0 }]);
-  };
-
-  const updateRubric = (id: string, field: 'condition' | 'points', value: string) => {
-    setRubrics(prev => prev.map(r => r.id === id ? { ...r, [field]: field === 'points' ? Math.max(0, parseFloat(value) || 0) : value } : r));
-  };
-
-  const removeRubric = (id: string) => {
-    setRubrics(prev => prev.filter(r => r.id !== id));
-  };
+  const rubricRef = useRef<HTMLInputElement>(null);
+  const examRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!rubricFile) {
+      setStatus('Error: Please select a rubric JSON file');
+      return;
+    }
+
+    if (examFiles.length === 0) {
+      setStatus('Error: Please select at least one exam PDF');
+      return;
+    }
+
     setUploading(true);
 
     try {
+      // Parse rubric JSON
+      const rubricText = await rubricFile.text();
+      const rubricData = JSON.parse(rubricText);
+
+      // Create course
       const courseRes = await fetch('http://localhost:8000/config/course/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,13 +38,46 @@ export default function UploadPortal() {
       });
       const course = await courseRes.json();
 
-      await fetch('http://localhost:8000/config/exam/', {
+      // Create exam
+      const examRes = await fetch('http://localhost:8000/config/exam/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: examTitle, course_id: course.id })
       });
+      const exam = await examRes.json();
 
-      setStatus('Upload successful! Grading in progress.');
+      // Upload rubric criteria
+      await fetch('http://localhost:8000/config/rubric/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exam_id: exam.id,
+          question_number: rubricData.question_number || '1',
+          max_score: rubricData.max_score || 5.0,
+          criteria: rubricData.criteria || rubricData
+        })
+      });
+
+      // Upload exam PDFs
+      for (const file of examFiles) {
+        const formData = new FormData();
+        formData.append('exam_id', exam.id.toString());
+        formData.append('student_id', `S${Math.floor(Math.random() * 10000)}`);
+        formData.append('file', file);
+
+        await fetch('http://localhost:8000/upload/submission/', {
+          method: 'POST',
+          body: formData
+        });
+      }
+
+      setStatus(`Success! Uploaded ${examFiles.length} exam(s) with rubric. Grading in progress.`);
+      setCourseTitle('');
+      setExamTitle('');
+      setRubricFile(null);
+      setExamFiles([]);
+      if (rubricRef.current) rubricRef.current.value = '';
+      if (examRef.current) examRef.current.value = '';
     } catch (error) {
       setStatus('Error: ' + String(error));
     } finally {
@@ -85,54 +117,31 @@ export default function UploadPortal() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">Rubric Criteria</label>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {rubrics.map(rubric => (
-                <div key={rubric.id} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Condition"
-                    value={rubric.condition}
-                    onChange={(e) => updateRubric(rubric.id, 'condition', e.target.value)}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Points"
-                    value={rubric.points}
-                    onChange={(e) => updateRubric(rubric.id, 'points', e.target.value)}
-                    className="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeRubric(rubric.id)}
-                    className="px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded text-xs font-medium"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addRubric}
-              className="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium"
-            >
-              + Add Criterion
-            </button>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Rubric (JSON)</label>
+            <input
+              ref={rubricRef}
+              type="file"
+              accept=".json"
+              onChange={(e) => setRubricFile(e.target.files?.[0] || null)}
+              className="block w-full text-xs text-gray-600 file:px-2 file:py-1 file:rounded file:text-xs file:bg-blue-50 file:text-blue-700 file:cursor-pointer file:border-0 file:mr-2"
+              required
+            />
+            {rubricFile && <p className="text-xs text-gray-500 mt-1">Selected: {rubricFile.name}</p>}
+            <p className="text-xs text-gray-500 mt-1">Example: {"{ \"max_score\": 5, \"criteria\": { \"q1\": { \"condition\": \"...\", \"points\": 5 } } }"}</p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Files</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Exam PDFs</label>
             <input
-              ref={fileInputRef}
+              ref={examRef}
               type="file"
               multiple
               accept=".pdf"
-              onChange={(e) => setFiles(Array.from(e.target.files || []))}
-              className="block w-full text-xs text-gray-600 file:px-2 file:py-1 file:rounded file:text-xs file:bg-blue-50 file:text-blue-700 file:cursor-pointer file:border-0 file:mr-2"
+              onChange={(e) => setExamFiles(Array.from(e.target.files || []))}
+              className="block w-full text-xs text-gray-600 file:px-2 file:py-1 file:rounded file:text-xs file:bg-green-50 file:text-green-700 file:cursor-pointer file:border-0 file:mr-2"
+              required
             />
-            {files.length > 0 && <p className="text-xs text-gray-500 mt-1">{files.length} file(s)</p>}
+            {examFiles.length > 0 && <p className="text-xs text-gray-500 mt-1">{examFiles.length} PDF(s) selected</p>}
           </div>
 
           <button
@@ -140,10 +149,18 @@ export default function UploadPortal() {
             disabled={uploading}
             className="w-full bg-blue-600 text-white py-1.5 rounded font-medium hover:bg-blue-700 disabled:opacity-50 text-sm transition"
           >
-            {uploading ? 'Uploading...' : 'Upload'}
+            {uploading ? 'Uploading...' : 'Upload & Grade'}
           </button>
 
-          {status && <div className="p-2 bg-blue-50 rounded text-xs text-blue-800 border border-blue-200">{status}</div>}
+          {status && (
+            <div className={`p-2 rounded text-xs border ${
+              status.includes('Success') 
+                ? 'bg-green-50 text-green-800 border-green-200' 
+                : 'bg-red-50 text-red-800 border-red-200'
+            }`}>
+              {status}
+            </div>
+          )}
         </form>
       </div>
     </div>
