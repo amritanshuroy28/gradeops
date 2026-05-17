@@ -20,16 +20,12 @@ class Settings(BaseSettings):
     max_upload_size: int = 100 * 1024 * 1024  # 100MB
     
     # AI Models
-    vlm_model: Literal["qwen-vl", "gpt-4-vision", "claude-3", "nvidia/llama-32-vision"] = "nvidia/llama-32-vision"
+    vlm_model: str = "nvidia/llama-32-vision"
     llm_model: str = "nvidia/llama-3.1-70b-instruct"
 
     # NVIDIA NIM Configuration
     nvidia_nim_api_key: str = os.getenv("NVIDIA_NIM_API_KEY", "")
     nvidia_nim_base_url: str = "https://integrate.api.nvidia.com/v1"
-
-    # LLM API Keys (for cloud-based models)
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     
     # Processing
     num_workers: int = 4
