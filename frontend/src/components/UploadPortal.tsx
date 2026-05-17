@@ -39,7 +39,7 @@ export default function UploadPortal() {
       });
       const course = await courseRes.json();
 
-      const examRes = await fetch('http://localhost:8000/config/exam/', {
+      await fetch('http://localhost:8000/config/exam/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: examTitle, course_id: course.id })
