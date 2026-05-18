@@ -1,5 +1,5 @@
 from typing import List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 class UserBase(BaseModel):
@@ -11,8 +11,7 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CourseBase(BaseModel):
     title: str
@@ -23,8 +22,7 @@ class CourseCreate(CourseBase):
 class Course(CourseBase):
     id: int
     instructor_id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ExamBase(BaseModel):
     title: str
@@ -35,8 +33,7 @@ class ExamCreate(ExamBase):
 class Exam(ExamBase):
     id: int
     course_id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class RubricBase(BaseModel):
     question_number: str
@@ -49,8 +46,7 @@ class RubricCreate(RubricBase):
 class Rubric(RubricBase):
     id: int
     exam_id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AnswerBase(BaseModel):
     submission_id: int
@@ -67,8 +63,7 @@ class Answer(AnswerBase):
     ai_justification: Optional[Any] = None
     final_score: Optional[float] = None
     status: str
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SubmissionBase(BaseModel):
     exam_id: int
@@ -82,8 +77,7 @@ class Submission(SubmissionBase):
     id: int
     uploaded_at: datetime
     answers: List[Answer] = []
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ReviewBase(BaseModel):
     answer_id: int
@@ -97,5 +91,4 @@ class ReviewCreate(ReviewBase):
 class Review(ReviewBase):
     id: int
     reviewed_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

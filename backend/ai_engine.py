@@ -267,7 +267,16 @@ Rubric Criteria:
 class PlagiarismDetector:
     def __init__(self):
         logger.info("Initializing Plagiarism Detector")
-        self.model = None
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("SentenceTransformer model loaded successfully")
+        except ImportError:
+            logger.warning("sentence_transformers not installed, plagiarism detection disabled")
+            self.model = None
+        except Exception as e:
+            logger.error(f"Error loading SentenceTransformer: {e}")
+            self.model = None
     
     def compute_similarity(self, text1: str, text2: str) -> float:
         if not self.model:

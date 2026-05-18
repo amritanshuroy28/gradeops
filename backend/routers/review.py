@@ -105,6 +105,8 @@ def override_answer(answer_id: int, final_score: float, comments: str = "", db: 
 
 @router.get("/plagiarism-check/{exam_id}")
 def check_plagiarism_for_exam(exam_id: int, threshold: float = 0.85, db: Session = Depends(database.get_db)):
+    if ai_engine.plagiarism_detector.model is None:
+        raise HTTPException(status_code=503, detail="Plagiarism detector model not initialized")
     try:
         submissions = db.query(models.Submission).filter(models.Submission.exam_id == exam_id).all()
         
