@@ -201,6 +201,11 @@ Rubric Criteria:
     def _grade_basic(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
         try:
             criteria = rubric.get("criteria", {})
+            if isinstance(criteria, str):
+                try:
+                    criteria = json.loads(criteria)
+                except Exception:
+                    criteria = {}
             max_score = rubric.get("max_score", 5.0)
 
             justification = {}

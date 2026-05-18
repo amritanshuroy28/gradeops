@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # Plagiarism Detection Threshold
     similarity_threshold: float = 0.85
     
+    # HuggingFace token (suppresses rate-limit warning for sentence-transformers)
+    hf_token: str = os.getenv("HF_TOKEN", "")
+    
     # Logging
     log_level: str = "INFO"
     

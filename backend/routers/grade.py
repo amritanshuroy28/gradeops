@@ -25,9 +25,17 @@ def process_grading(answer_id: int, db: Session):
         
         rubric = db.query(models.Rubric).filter(models.Rubric.id == answer.rubric_id).first()
         if rubric:
+            import json as _json
+            criteria = rubric.criteria or {}
+            if isinstance(criteria, str):
+                try:
+                    criteria = _json.loads(criteria)
+                except Exception:
+                    criteria = {}
             rubric_dict = {
-                "criteria": rubric.criteria or {},
-                "max_score": rubric.max_score
+                "criteria": criteria,
+                "max_score": rubric.max_score,
+                "question_number": rubric.question_number,
             }
             grading_result = ai_engine.agentic_grade_answer(extracted_text, rubric_dict)
             
