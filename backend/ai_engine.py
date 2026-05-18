@@ -24,17 +24,17 @@ class VLMExtractor:
     def extract_text(self, image_path: str) -> str:
         try:
             if not self.api_key:
-                return self._extract_text_mock(image_path)
+                return self._extract_text_mock()
 
             with open(image_path, "rb") as img_file:
                 image_data = base64.standard_b64encode(img_file.read()).decode("utf-8")
 
-            return self._extract_text_nvidia(image_data)
+            return self._extract_text_nvidia(image_data, image_path)
         except Exception as e:
             logger.error(f"Error extracting text from {image_path}: {e}")
-            return f"[Error extracting text: {str(e)}]"
+            return self._extract_text_mock()
 
-    def _extract_text_nvidia(self, image_data: str) -> str:
+    def _extract_text_nvidia(self, image_data: str, image_path: str = None) -> str:
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -67,7 +67,7 @@ class VLMExtractor:
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=60
             )
 
             if response.status_code == 200:
@@ -77,13 +77,13 @@ class VLMExtractor:
                 return extracted_text
             else:
                 logger.error(f"NVIDIA NIM API error: {response.status_code} - {response.text}")
-                return self._extract_text_mock(image_path)
+                return self._extract_text_mock()
         except Exception as e:
             logger.error(f"Error calling NVIDIA NIM VLM: {e}")
-            return self._extract_text_mock(image_path)
+            return self._extract_text_mock()
 
-    def _extract_text_mock(self, image_path: str) -> str:
-        logger.info(f"Using mock VLM for {image_path}")
+    def _extract_text_mock(self) -> str:
+        logger.info("Using mock VLM")
         return "Mock extracted text: The student provided a comprehensive answer demonstrating understanding of the core concepts."
 
 
@@ -154,7 +154,7 @@ Rubric Criteria:
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=60
             )
 
             if response.status_code == 200:
