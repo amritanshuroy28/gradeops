@@ -20,12 +20,13 @@ class Settings(BaseSettings):
     max_upload_size: int = 100 * 1024 * 1024  # 100MB
     
     # AI Models
-    vlm_model: str = "nvidia/llama-32-vision"
+    vlm_model: str = "nvidia/llama-3.2-11b-vision-instruct"
     llm_model: str = "nvidia/llama-3.1-70b-instruct"
 
     # NVIDIA NIM Configuration
     nvidia_nim_api_key: str = os.getenv("NVIDIA_NIM_API_KEY", "")
     nvidia_nim_base_url: str = os.getenv("NVIDIA_NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
+    server_base_url: str = os.getenv("SERVER_BASE_URL", "http://localhost:8000")
     
     # Processing
     num_workers: int = 4

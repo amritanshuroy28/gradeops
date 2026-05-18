@@ -1,103 +1,193 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* =============================================
+   GRADEOPS — Global Design System
+   ============================================= */
 
 :root {
   color-scheme: light dark;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Brand */
+  --brand-primary: 99 102 241;    /* indigo-500 */
+  --brand-accent:  139 92 246;    /* violet-500 */
+  --brand-emerald: 16 185 129;    /* emerald-500 */
+
+  /* Surfaces (light) */
+  --surface-0: 255 255 255;
+  --surface-1: 248 250 252;
+  --surface-2: 241 245 249;
+
+  /* Elevation shadows */
+  --shadow-sm:  0 1px 3px 0 rgb(0 0 0 / .06), 0 1px 2px -1px rgb(0 0 0 / .06);
+  --shadow-md:  0 4px 12px -2px rgb(0 0 0 / .08), 0 2px 4px -2px rgb(0 0 0 / .05);
+  --shadow-lg:  0 10px 30px -5px rgb(0 0 0 / .1), 0 4px 8px -4px rgb(0 0 0 / .06);
+  --shadow-xl:  0 20px 50px -10px rgb(0 0 0 / .12);
+  --shadow-brand: 0 8px 24px -4px rgb(var(--brand-primary) / .35);
 }
+
+/* =============================================
+   Base
+   ============================================= */
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: rgb(var(--surface-1));
 }
 
 #root {
   margin: 0;
   width: 100%;
+  min-height: 100vh;
 }
 
+/* =============================================
+   Keyframe Animations
+   ============================================= */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
-  70% { box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes shimmer {
-  0% { background-position: -468px 0; }
-  100% { background-position: 468px 0; }
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.5s ease-out forwards;
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgb(var(--brand-primary) / .4); }
+  70%  { box-shadow: 0 0 0 14px rgb(var(--brand-primary) / 0); }
+  100% { box-shadow: 0 0 0 0   rgb(var(--brand-primary) / 0); }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.animate-slide-in-right {
-  animation: slideInRight 0.4s ease-out forwards;
+@keyframes float {
+  0%, 100% { transform: translateY(0px);   }
+  50%       { transform: translateY(-8px);  }
 }
 
-.animate-pulse-ring {
-  animation: pulse-ring 2s infinite;
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%;   }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%;   }
 }
 
+/* =============================================
+   Animation Utilities
+   ============================================= */
+.animate-fade-in-up       { animation: fadeInUp     0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
+.animate-fade-in          { animation: fadeIn       0.35s ease-out forwards; }
+.animate-slide-in-right   { animation: slideInRight 0.4s cubic-bezier(0.16,1,0.3,1) forwards; }
+.animate-slide-in-left    { animation: slideInLeft  0.4s cubic-bezier(0.16,1,0.3,1) forwards; }
+.animate-scale-in         { animation: scaleIn      0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
+.animate-pulse-ring       { animation: pulse-ring   2s infinite; }
+.animate-spin             { animation: spin         0.8s linear infinite; }
+.animate-float            { animation: float        3s ease-in-out infinite; }
+
+/* Shimmer skeleton */
 .animate-shimmer {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 1000px 100%;
-  animation: shimmer 1.5s infinite linear;
+  background: linear-gradient(
+    90deg,
+    rgb(241 245 249) 0%,
+    rgb(226 232 240) 40%,
+    rgb(241 245 249) 80%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
+.dark .animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(30 41 59) 0%,
+    rgb(51 65 85) 40%,
+    rgb(30 41 59) 80%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* =============================================
+   Drag-over state
+   ============================================= */
 .drag-over {
-  border-color: #3b82f6 !important;
-  background-color: rgba(59, 130, 246, 0.05) !important;
-  transform: scale(1.01);
+  border-color: rgb(var(--brand-primary)) !important;
+  background-color: rgb(var(--brand-primary) / .05) !important;
+  transform: scale(1.015);
+  box-shadow: 0 0 0 4px rgb(var(--brand-primary) / .1);
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
+/* =============================================
+   Custom Scrollbar
+   ============================================= */
+.scrollbar-thin::-webkit-scrollbar       { width: 5px; height: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+  background: rgb(203 213 225);
+  border-radius: 99px;
+}
+.dark .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(71 85 105); }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184); }
+
+/* =============================================
+   Glassmorphism Card
+   ============================================= */
+.glass {
+  background: rgb(255 255 255 / .7);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgb(255 255 255 / .5);
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+.dark .glass {
+  background: rgb(15 23 42 / .65);
+  border: 1px solid rgb(255 255 255 / .06);
+}
+
+/* =============================================
+   Animated Gradient Text
+   ============================================= */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 4s ease infinite;
+}
+
+/* =============================================
+   Focus ring override (accessible)
+   ============================================= */
+:focus-visible {
+  outline: 2px solid rgb(var(--brand-primary));
+  outline-offset: 2px;
 }

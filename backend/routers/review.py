@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Any, Dict
 from datetime import datetime
+import os
 import models, schemas, database, ai_engine
+from config import settings
 from logger import get_logger
 import glob
 
@@ -23,19 +25,19 @@ def get_pending_answers(db: Session = Depends(database.get_db)):
         
         all_pages = []
         if submission:
-            pattern = f"artifacts/sub_{submission.id}_page_*.png"
+            pattern = os.path.join(settings.artifacts_dir, f"sub_{submission.id}_page_*.png")
             def extract_page_num(filepath):
                 return int(filepath.split("_page_")[-1].split(".")[0])
             
             paths = glob.glob(pattern)
             paths.sort(key=extract_page_num)
-            all_pages = [f"http://localhost:8000/{p}" for p in paths]
+            all_pages = [f"{settings.server_base_url}/artifacts/{os.path.basename(p)}" for p in paths]
         
         result.append({
             "id": ans.id,
             "student_id": submission.student_id if submission else "Unknown",
             "question": f"Q{rubric.question_number}" if rubric else "Unknown",
-            "image_url": f"http://localhost:8000/{ans.image_path}",
+            "image_url": f"{settings.server_base_url}/artifacts/{os.path.basename(ans.image_path)}",
             "all_pages": all_pages,
             "extracted_text": ans.extracted_text,
             "ai_score": ans.ai_score,

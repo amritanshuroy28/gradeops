@@ -32,6 +32,10 @@ async def upload_submission(
             logger.warning(f"File size {file.size} exceeds maximum allowed size")
             raise HTTPException(status_code=413, detail="File too large (max 100MB)")
 
+        # Derive student_id from filename (stem, without extension)
+        from pathlib import Path as _Path
+        derived_student_id = _Path(file.filename).stem if file.filename else student_id
+
         file_path = os.path.join(utils.UPLOAD_DIR, file.filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -40,7 +44,7 @@ async def upload_submission(
 
         new_submission = models.Submission(
             exam_id=exam_id,
-            student_id=student_id,
+            student_id=derived_student_id,
             pdf_path=file_path
         )
         db.add(new_submission)

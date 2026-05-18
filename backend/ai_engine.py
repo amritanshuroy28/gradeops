@@ -162,6 +162,12 @@ Rubric Criteria:
                 response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
                 try:
+                    # Strip markdown code fences if present (LLMs often wrap JSON in ```json ... ```)
+                    response_text = response_text.strip()
+                    if response_text.startswith("```"):
+                        lines = response_text.split("\n")
+                        # Remove first line (```json or ```) and last line (```)
+                        response_text = "\n".join(lines[1:-1]).strip()
                     grade_data = json.loads(response_text)
                     score = min(grade_data.get("score", 0), max_score)
 

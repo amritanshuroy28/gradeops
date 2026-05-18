@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from logger import get_logger
 import models, schemas, database
 
@@ -56,7 +56,7 @@ def create_exam(exam: schemas.ExamCreate, db: Session = Depends(database.get_db)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/exam/", response_model=List[schemas.Exam])
-def list_exams(course_id: int = None, db: Session = Depends(database.get_db)):
+def list_exams(course_id: Optional[int] = None, db: Session = Depends(database.get_db)):
     query = db.query(models.Exam)
     if course_id:
         query = query.filter(models.Exam.course_id == course_id)
