@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     max_upload_size: int = 100 * 1024 * 1024  # 100MB
     
     # AI Models
-    vlm_model: str = "nvidia/llama-3.2-11b-vision-instruct"
-    llm_model: str = "nvidia/llama-3.1-70b-instruct"
+    vlm_model: str = "meta/llama-3.2-90b-vision-instruct"
+    llm_model: str = "meta/llama-3.1-70b-instruct"
 
     # NVIDIA NIM Configuration
     nvidia_nim_api_key: str = os.getenv("NVIDIA_NIM_API_KEY", "")

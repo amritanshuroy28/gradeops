@@ -109,14 +109,22 @@ class GradingAgent:
         self.api_key = settings.nvidia_nim_api_key
         self.base_url = settings.nvidia_nim_base_url
 
+        logger.info(f"LLM Model: {settings.llm_model}")
+        logger.info(f"Base URL: {self.base_url}")
+
         if not self.api_key:
             logger.warning("NVIDIA_NIM_API_KEY not set, grading will use basic evaluation")
             self.app = None
         else:
+            # Ensure base_url has trailing slash for correct httpx url joining
+            safe_base_url = self.base_url
+            if not safe_base_url.endswith("/"):
+                safe_base_url += "/"
+                
             self.llm = ChatOpenAI(
                 model=settings.llm_model,
                 api_key=self.api_key,
-                base_url=self.base_url,
+                base_url=safe_base_url,
                 temperature=0.1,
                 max_retries=2
             )
@@ -347,11 +355,14 @@ If there are errors, respond with: {{"approved": false, "feedback": "<detailed i
             }
     
     def _evaluate_condition(self, condition: str, text: str) -> bool:
-        keywords = condition.lower().split()
+        # Filter out common stop words for better matching
+        stop_words = {'the','a','an','is','are','was','were','be','been','has','have','had','do','does','did','will','would','could','should','may','might','must','shall','can','and','but','or','not','no','of','in','to','for','with','on','at','by','from','that','this','it','its'}
+        keywords = [w for w in condition.lower().split() if w not in stop_words and len(w) > 2]
+        if not keywords:
+            return True  # No meaningful keywords = give benefit of doubt
         text_lower = text.lower()
-        
         matches = sum(1 for keyword in keywords if keyword in text_lower)
-        return matches >= len(keywords) * 0.6
+        return matches >= max(1, len(keywords) * 0.3)  # 30% threshold for basic matching
     
     def _generate_feedback(self, justification: Dict, score: float, max_score: float) -> str:
         met_criteria = sum(1 for k, v in justification.items() if k.startswith("criterion") and v.get("met"))
@@ -378,8 +389,24 @@ class PlagiarismDetector:
         logger.info("Initializing Plagiarism Detector")
         try:
             from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("SentenceTransformer model loaded successfully")
+            try:
+                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                logger.info("SentenceTransformer model loaded successfully")
+            except Exception as e:
+                import os
+                logger.warning(f"Failed to load model ({e}). Clearing token cache and retrying anonymously...")
+                # Remove token from environment
+                os.environ.pop("HF_TOKEN", None)
+                os.environ.pop("HUGGING_FACE_HUB_TOKEN", None)
+                # Clear huggingface_hub's internal cached token
+                try:
+                    import huggingface_hub
+                    huggingface_hub.utils.get_token = lambda: None
+                except Exception:
+                    pass
+                # Retry with token explicitly disabled
+                self.model = SentenceTransformer('all-MiniLM-L6-v2', token=False)
+                logger.info("SentenceTransformer model loaded successfully (anonymous)")
         except ImportError:
             logger.warning("sentence_transformers not installed, plagiarism detection disabled")
             self.model = None

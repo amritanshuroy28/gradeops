@@ -16,9 +16,15 @@ import utils
 
 logger = get_logger(__name__)
 
-if settings.hf_token:
-    os.environ["HF_TOKEN"] = settings.hf_token
-    os.environ["HUGGING_FACE_HUB_TOKEN"] = settings.hf_token
+# Only set HF token if it looks valid (non-empty, starts with hf_, reasonable length)
+# An invalid token poisons the huggingface_hub cache and breaks SentenceTransformer loading
+if settings.hf_token and settings.hf_token.startswith("hf_") and len(settings.hf_token) > 20:
+    try:
+        import huggingface_hub
+        huggingface_hub.login(token=settings.hf_token, add_to_git_credential=False)
+        logger.info("HuggingFace token validated and set")
+    except Exception as e:
+        logger.warning(f"HuggingFace token appears invalid, skipping: {e}")
 
 models.Base.metadata.create_all(bind=engine)
 
