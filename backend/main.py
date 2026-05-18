@@ -16,8 +16,7 @@ import utils
 
 logger = get_logger(__name__)
 
-# Set HuggingFace token if configured (suppresses unauthenticated rate-limit warnings)
-if settings.hf_token and settings.hf_token != "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":
+if settings.hf_token:
     os.environ["HF_TOKEN"] = settings.hf_token
     os.environ["HUGGING_FACE_HUB_TOKEN"] = settings.hf_token
 
