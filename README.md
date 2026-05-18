@@ -14,11 +14,6 @@ A production-ready Human-in-the-Loop (HITL) grading pipeline using Vision-Langua
 
 ## Quick Start
 
-### Live Deployment
-- **Frontend**: https://gradeops-frontend.onrender.com
-- **Backend API**: https://gradeops-backend.onrender.com
-- **API Docs**: https://gradeops-backend.onrender.com/docs
-
 ### Prerequisites
 - Docker & Docker Compose (recommended)
 - Python 3.11+ (for local development)
