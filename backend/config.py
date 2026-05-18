@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # NVIDIA NIM Configuration
     nvidia_nim_api_key: str = os.getenv("NVIDIA_NIM_API_KEY", "")
-    nvidia_nim_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_nim_base_url: str = os.getenv("NVIDIA_NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
     
     # Processing
     num_workers: int = 4
