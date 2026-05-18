@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, TypedDict
 import base64
 import io
 from pathlib import Path
@@ -8,6 +8,11 @@ from logger import get_logger
 from config import settings
 import numpy as np
 import requests
+
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langgraph.graph import StateGraph, END
 
 logger = get_logger(__name__)
 
@@ -87,20 +92,51 @@ class VLMExtractor:
         return "Mock extracted text: The student provided a comprehensive answer demonstrating understanding of the core concepts."
 
 
+class GradingState(TypedDict):
+    extracted_text: str
+    rubric: Dict[str, Any]
+    max_score: float
+    question_number: str
+    current_grade: Dict[str, Any]
+    feedback: str
+    iterations: int
+    error: str
+
 class GradingAgent:
     def __init__(self):
-        logger.info("Initializing Grading Agent")
+        logger.info("Initializing Grading Agent (LangGraph)")
         self.vlm = VLMExtractor(model_name=settings.vlm_model)
         self.api_key = settings.nvidia_nim_api_key
         self.base_url = settings.nvidia_nim_base_url
 
         if not self.api_key:
             logger.warning("NVIDIA_NIM_API_KEY not set, grading will use basic evaluation")
+            self.app = None
+        else:
+            self.llm = ChatOpenAI(
+                model=settings.llm_model,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=0.1,
+                max_retries=2
+            )
+            self.app = self._build_graph()
+
+    def _build_graph(self):
+        workflow = StateGraph(GradingState)
+        workflow.add_node("grade", self._node_grade)
+        workflow.add_node("critique", self._node_critique)
+        
+        workflow.set_entry_point("grade")
+        workflow.add_edge("grade", "critique")
+        workflow.add_conditional_edges("critique", self._should_continue)
+        
+        return workflow.compile()
 
     def grade_answer(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            if self.api_key:
-                return self._grade_with_nvidia(extracted_text, rubric)
+            if self.app:
+                return self._grade_with_langgraph(extracted_text, rubric)
             else:
                 return self._grade_basic(extracted_text, rubric)
         except Exception as e:
@@ -112,90 +148,148 @@ class GradingAgent:
                 "success": False
             }
 
-    def _grade_with_nvidia(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            criteria = rubric.get("criteria", {})
-            max_score = rubric.get("max_score", 5.0)
-            question = rubric.get("question_number", "Unknown")
+    def _node_grade(self, state: GradingState) -> GradingState:
+        prompt_str = """You are an expert exam grader. Grade the following student answer according to the rubric.
 
-            prompt = f"""You are an expert exam grader. Grade the following student answer according to the rubric.
-
-Question: {question}
+Question: {question_number}
 Student Answer: {extracted_text}
 
 Rubric Criteria:
-"""
-            for criterion_key, criterion in criteria.items():
+{rubric_text}
+
+Feedback from previous attempt (fix these issues):
+{feedback}
+
+Respond in JSON format with exactly:
+{{"score": <total_score>, "justification": {{"criterion_1": {{"met": true/false, "explanation": "...", "score_awarded": <points>}}, ...}}, "feedback": "overall feedback..."}}"""
+        
+        rubric_text = ""
+        for i, (criterion_key, criterion) in enumerate(state["rubric"].items(), 1):
+            if isinstance(criterion, dict):
                 condition = criterion.get("condition", "")
                 points = criterion.get("points", 0)
-                prompt += f"\n- {condition} ({points} points)"
-
-            prompt += f"\n\nRespond in JSON format with:"
-            prompt += "\n{\"score\": <total_score>, \"justification\": {{\"criterion_1\": {{\"met\": true/false, \"explanation\": \"...\"}}, ...}}, \"feedback\": \"...\"}"
-
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-
-            payload = {
-                "model": settings.llm_model,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.3,
-                "max_tokens": 1024
-            }
-
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=60
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-
-                try:
-                    # Strip markdown code fences if present (LLMs often wrap JSON in ```json ... ```)
-                    response_text = response_text.strip()
-                    if response_text.startswith("```"):
-                        lines = response_text.split("\n")
-                        # Remove first line (```json or ```) and last line (```)
-                        response_text = "\n".join(lines[1:-1]).strip()
-                    grade_data = json.loads(response_text)
-                    score = min(grade_data.get("score", 0), max_score)
-
-                    justification = {}
-                    for i, (criterion_key, criterion) in enumerate(criteria.items(), 1):
-                        criterion_data = grade_data.get("justification", {}).get(f"criterion_{i}", {})
-                        justification[f"criterion_{i}"] = {
-                            "condition": criterion.get("condition", ""),
-                            "met": criterion_data.get("met", False),
-                            "score_awarded": criterion.get("points", 0) if criterion_data.get("met") else 0,
-                            "explanation": criterion_data.get("explanation", "")
-                        }
-
-                    return {
-                        "score": score,
-                        "max_score": max_score,
-                        "justification": justification,
-                        "feedback": grade_data.get("feedback", ""),
-                        "success": True
-                    }
-                except json.JSONDecodeError:
-                    logger.warning("Failed to parse NVIDIA NIM response as JSON, falling back to basic grading")
-                    return self._grade_basic(extracted_text, rubric)
             else:
-                logger.error(f"NVIDIA NIM API error: {response.status_code} - {response.text}")
-                return self._grade_basic(extracted_text, rubric)
+                condition = str(criterion)
+                points = state["max_score"] / max(1, len(state["rubric"]))
+            rubric_text += f"\n- criterion_{i}: {condition} ({points} points)"
+
+        prompt = PromptTemplate(
+            template=prompt_str,
+            input_variables=["question_number", "extracted_text", "rubric_text", "feedback"]
+        )
+        
+        chain = prompt | self.llm | JsonOutputParser()
+        
+        try:
+            result = chain.invoke({
+                "question_number": state["question_number"],
+                "extracted_text": state["extracted_text"],
+                "rubric_text": rubric_text,
+                "feedback": state["feedback"] or "None."
+            })
+            return {"current_grade": result, "iterations": state["iterations"] + 1, "error": ""}
         except Exception as e:
-            logger.error(f"Error grading with NVIDIA NIM: {e}")
+            logger.error(f"LLM parsing error: {e}")
+            return {"error": str(e), "iterations": state["iterations"] + 1}
+
+    def _node_critique(self, state: GradingState) -> GradingState:
+        if state.get("error"):
+            return {"feedback": f"Parsing failed: {state['error']}. Ensure output is valid JSON."}
+            
+        prompt_str = """You are a strict Teaching Assistant reviewing a proposed grade.
+Check if the proposed grade strictly follows the rubric based on the student's answer.
+
+Student Answer: {extracted_text}
+Rubric Max Score: {max_score}
+
+Proposed Grade JSON:
+{current_grade}
+
+Rules:
+1. The total score must not exceed max_score.
+2. The total score must equal the sum of 'score_awarded' for all met criteria.
+3. Criteria marked 'met': true MUST be supported by the student's answer.
+
+If the grade is perfect and follows all rules, respond with a JSON object: {{"approved": true, "feedback": "APPROVED"}}
+If there are errors, respond with: {{"approved": false, "feedback": "<detailed instructions on what to fix>"}}"""
+
+        prompt = PromptTemplate(
+            template=prompt_str,
+            input_variables=["extracted_text", "max_score", "current_grade"]
+        )
+        
+        chain = prompt | self.llm | JsonOutputParser()
+        
+        try:
+            result = chain.invoke({
+                "extracted_text": state["extracted_text"],
+                "max_score": state["max_score"],
+                "current_grade": json.dumps(state["current_grade"])
+            })
+            if result.get("approved"):
+                return {"feedback": "APPROVED"}
+            else:
+                return {"feedback": result.get("feedback", "Unknown error in grading logic.")}
+        except Exception as e:
+            logger.error(f"Critique error: {e}")
+            return {"feedback": "APPROVED"} # Fail open if critique fails
+
+    def _should_continue(self, state: GradingState) -> str:
+        if state.get("feedback") == "APPROVED" or state.get("iterations", 0) >= 2:
+            return END
+        return "grade"
+
+    def _grade_with_langgraph(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
+        criteria = rubric.get("criteria", {})
+        if isinstance(criteria, str):
+            try: criteria = json.loads(criteria)
+            except: criteria = {}
+        max_score = rubric.get("max_score", 5.0)
+        question = rubric.get("question_number", "Unknown")
+
+        state = {
+            "extracted_text": extracted_text,
+            "rubric": criteria,
+            "max_score": max_score,
+            "question_number": question,
+            "current_grade": {},
+            "feedback": "",
+            "iterations": 0,
+            "error": ""
+        }
+        
+        try:
+            result = self.app.invoke(state)
+            grade_data = result.get("current_grade", {})
+            
+            score = min(grade_data.get("score", 0), max_score)
+            
+            final_just = {}
+            for i, (criterion_key, criterion) in enumerate(criteria.items(), 1):
+                criterion_data = grade_data.get("justification", {}).get(f"criterion_{i}", {})
+                if isinstance(criterion, dict):
+                    condition = criterion.get("condition", "")
+                    points = criterion.get("points", 0)
+                else:
+                    condition = str(criterion)
+                    points = max_score / max(1, len(criteria))
+                    
+                final_just[f"criterion_{i}"] = {
+                    "condition": condition,
+                    "met": criterion_data.get("met", False),
+                    "score_awarded": points if criterion_data.get("met") else 0,
+                    "explanation": criterion_data.get("explanation", "")
+                }
+                
+            return {
+                "score": score,
+                "max_score": max_score,
+                "justification": final_just,
+                "feedback": grade_data.get("feedback", ""),
+                "success": True
+            }
+        except Exception as e:
+            logger.error(f"LangGraph execution error: {e}")
             return self._grade_basic(extracted_text, rubric)
 
     def _grade_basic(self, extracted_text: str, rubric: Dict[str, Any]) -> Dict[str, Any]:
@@ -212,8 +306,12 @@ Rubric Criteria:
             total_score = 0.0
 
             for i, (criterion_key, criterion) in enumerate(criteria.items(), 1):
-                condition = criterion.get("condition", "")
-                points = criterion.get("points", 0)
+                if isinstance(criterion, dict):
+                    condition = criterion.get("condition", "")
+                    points = criterion.get("points", 0)
+                else:
+                    condition = str(criterion)
+                    points = max_score / max(1, len(criteria))
 
                 met = self._evaluate_condition(condition, extracted_text)
 
