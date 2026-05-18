@@ -93,7 +93,8 @@ def read_root():
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     try:
-        db.execute("SELECT 1")
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         stats = utils.get_storage_stats()
         return {
             "status": "healthy",
