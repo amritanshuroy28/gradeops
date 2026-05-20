@@ -215,7 +215,7 @@ export default function ReviewDashboard() {
 
               {/* Dot strip */}
               <div className="flex gap-1.5 overflow-x-auto max-w-xs flex-wrap justify-center">
-                {pages?.map((url, i) => (
+                {pages?.map((_, i) => (
                   <button key={i} onClick={() => setPageIndex(i)}
                     className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all ${i === pageIndex ? 'bg-indigo-400 scale-125' : 'bg-slate-600 hover:bg-slate-400'}`} />
                 ))}

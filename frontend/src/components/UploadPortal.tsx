@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, DragEvent } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import type { DragEvent } from 'react';
 
 interface FileEntry { file: File; status: 'idle' | 'uploading' | 'done' | 'error'; }
 
