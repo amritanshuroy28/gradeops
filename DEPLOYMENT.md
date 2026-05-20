@@ -135,6 +135,106 @@ kubectl apply -f k8s/frontend-deployment.yaml -n gradeops
 kubectl apply -f k8s/postgres-deployment.yaml -n gradeops
 ```
 
+## Free Tier Cloud Deployment
+
+Due to the backend using PyTorch/SentenceTransformers (which are heavy machine learning dependencies), standard free-tier web hosting platforms like Render or Koyeb with a 512MB RAM limit will run out of memory during installation or execution.
+
+To deploy GradeOps completely free, we recommend the following stack:
+1. **Database:** [Neon](https://neon.tech/) (Generous serverless PostgreSQL free tier)
+2. **Backend API:** [Hugging Face Spaces](https://huggingface.co/spaces) (Docker Space with free 16GB RAM CPU tier)
+3. **Frontend:** [Vercel](https://vercel.com/) or [Netlify](https://netlify.com/) (Free fast static hosting for React SPA)
+
+---
+
+### 1. Database Setup (Neon Postgres)
+
+1. Sign up on [Neon.tech](https://neon.tech/) and create a new project.
+2. In the Neon Console, choose a name for your database (e.g., `gradeops`) and region.
+3. Once created, copy the **Connection String** from the dashboard. It will look like:
+   ```env
+   postgresql://alex:strongpassword@ep-cool-snowflake-123456.us-east-2.aws.neon.tech/gradeops?sslmode=require
+   ```
+4. Keep this connection string safe. You will need it for the backend environment variables.
+
+---
+
+### 2. Backend Deployment (Hugging Face Spaces)
+
+Hugging Face Spaces allows you to host Docker containers. The free CPU tier provides **16GB RAM and 50GB space**, which is more than enough to load PyTorch and SentenceTransformer models.
+
+#### A. Configure the backend for Hugging Face
+Hugging Face expects web apps to run on port `7860`. We can add a custom `Dockerfile` or modify the existing one.
+1. Create a `Dockerfile` inside the `backend` folder (or use the existing one, but we must configure the launch port).
+2. Create a new `README.md` at the root of your Hugging Face Space repository with the following YAML header block (Metadata) so Hugging Face knows how to run your space:
+   ```yaml
+   ---
+   title: GradeOps Backend
+   emoji: 📝
+   colorFrom: indigo
+   colorTo: purple
+   sdk: docker
+   app_port: 7860
+   ---
+   ```
+
+#### B. Create the Space and Upload Code
+1. Log in to [Hugging Face](https://huggingface.co/) and click **New Space**.
+2. Set the Space name (e.g., `gradeops-backend`), select **Docker** as the SDK, and choose **Blank** (or any Docker template).
+3. Set the visibility to **Public** (required for the free tier, but keep your keys secure!).
+4. Push your backend code to the Space's Git repository. Ensure the files in the Space repository match the structure of your `backend` folder, with `Dockerfile` at the root of the repository.
+5. In your backend `Dockerfile`, make sure the final CMD starts Uvicorn on port `7860`:
+   ```dockerfile
+   CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+   ```
+
+#### C. Set Environment Variables
+In the Hugging Face Space **Settings** tab, scroll to **Variables and secrets** and add:
+- `DATABASE_URL`: Your Neon Postgres connection string.
+- `DEBUG`: `false`
+- `LOG_LEVEL`: `INFO`
+- `NVIDIA_NIM_API_KEY`: *(Optional)* Your Nvidia API key if using VLM grading.
+- `NVIDIA_NIM_BASE_URL`: *(Optional)* Your Nvidia base URL.
+
+Once the environment variables are saved, restart/rebuild the space. The Space will build the image, download the dependencies, and expose your backend API.
+Your API will be publicly available at: `https://<username>-<space-name>.hf.space/` (e.g., `https://huggingface.co/spaces/username/spacename` points to the interface, and the direct API URL is `https://username-spacename.hf.space`).
+
+---
+
+### 3. Frontend Deployment (Vercel or Netlify)
+
+The React/Vite frontend is a static single-page application and can be hosted for free on Vercel or Netlify.
+
+#### A. Prepare Frontend Environment
+1. Ensure the frontend connects to the deployed backend. Create a `.env.production` file in your `frontend/` directory (or configure this in the hosting settings):
+   ```env
+   VITE_API_URL=https://username-spacename.hf.space
+   ```
+   *(Replace with your actual Hugging Face Space API URL, ensuring no trailing slash).*
+
+#### B. Option 1: Deploy on Vercel (Recommended)
+1. Install Vercel CLI locally or connect your GitHub repository to [Vercel Dashboard](https://vercel.com).
+2. If connecting GitHub:
+   - Select your repository.
+   - Set **Root Directory** to `frontend`.
+   - Vercel will automatically detect **Vite** as the framework preset and configure the build command (`npm run build`) and output directory (`dist`).
+   - In the **Environment Variables** section, add:
+     - Key: `VITE_API_URL`
+     - Value: `https://username-spacename.hf.space`
+   - Click **Deploy**.
+
+#### C. Option 2: Deploy on Netlify
+1. Connect your GitHub repository to [Netlify](https://www.netlify.com/).
+2. Select the repository and configure the build settings:
+   - **Base directory:** `frontend`
+   - **Build command:** `npm run build`
+   - **Publish directory:** `frontend/dist`
+3. Add Environment Variable:
+   - Key: `VITE_API_URL`
+   - Value: `https://username-spacename.hf.space`
+4. Click **Deploy Site**.
+
+---
+
 ## Environment Configuration
 
 ### Development (.env)
