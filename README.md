@@ -2,6 +2,12 @@
 
 A production-ready Human-in-the-Loop (HITL) grading pipeline using Vision-Language Models (VLMs) and Agentic LLMs to evaluate scanned exams against strict rubrics, with Teaching Assistant (TA) review dashboards for rapid approval or override.
 
+## Deployed Links
+
+* **Backend API (FastAPI)**: [https://artemis6969-gradeops-backend.hf.space](https://artemis6969-gradeops-backend.hf.space)
+  * Hugging Face Space Repository: [artemis6969/gradeops-backend](https://huggingface.co/spaces/artemis6969/gradeops-backend)
+* **Frontend App**: [https://gradeops.vercel.app/](https://gradeops.vercel.app/)
+
 ## Features
 
 - **AI-Powered Grading**: Vision models extract handwritten text, LLM agents grade against rubrics
