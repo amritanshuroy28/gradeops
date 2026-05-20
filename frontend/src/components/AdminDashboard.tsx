@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 interface Stats {
   storage: { disk_percent: number; upload_dir_size: number; artifacts_dir_size: number; disk_total: number; disk_used: number; };
@@ -19,8 +20,8 @@ export default function AdminDashboard() {
     const fetchStats = async () => {
       try {
         const [statsRes, summaryRes] = await Promise.all([
-          fetch('http://localhost:8000/monitor/stats'),
-          fetch(`http://localhost:8000/monitor/exam-summary/${examId}`)
+          fetch(`${API_BASE}/monitor/stats`),
+          fetch(`${API_BASE}/monitor/exam-summary/${examId}`)
         ]);
         if (statsRes.ok) setStats(await statsRes.json());
         if (summaryRes.ok) setExamSummary(await summaryRes.json());
@@ -39,7 +40,7 @@ export default function AdminDashboard() {
     if (!examId) return;
     setPlagChecking(true); setPlagResult(null);
     try {
-      const res = await fetch(`http://localhost:8000/review/plagiarism-check/${examId}`);
+      const res = await fetch(`${API_BASE}/review/plagiarism-check/${examId}`);
       if (!res.ok) throw new Error('Failed to run scan');
       setPlagResult(await res.json());
     } catch (err: any) {

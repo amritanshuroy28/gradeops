@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE } from '../config';
 
 interface Answer {
   id: string;
@@ -26,7 +27,7 @@ export default function ReviewDashboard() {
 
   const loadAnswers = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/review/pending');
+      const res = await fetch(`${API_BASE}/review/pending`);
       const data = await res.json();
       setAnswers(data);
       setLoading(false);
@@ -67,7 +68,7 @@ export default function ReviewDashboard() {
     if (!current || submitting) return;
     setSubmitting(true);
     try {
-      await fetch(`http://localhost:8000/review/${current.id}/approve?final_score=${score}`, { method: 'POST' });
+      await fetch(`${API_BASE}/review/${current.id}/approve?final_score=${score}`, { method: 'POST' });
       setFeedback({ type: 'success', text: 'Approved!' });
       setTimeout(() => { removeAndAdvance(); setSubmitting(false); }, 400);
     } catch {
@@ -81,7 +82,7 @@ export default function ReviewDashboard() {
     setSubmitting(true);
     try {
       const p = new URLSearchParams({ final_score: score, comments: overrideComment });
-      await fetch(`http://localhost:8000/review/${current.id}/override?${p}`, { method: 'POST' });
+      await fetch(`${API_BASE}/review/${current.id}/override?${p}`, { method: 'POST' });
       setFeedback({ type: 'success', text: 'Overridden!' });
       setTimeout(() => { removeAndAdvance(); setSubmitting(false); setShowOverride(false); }, 400);
     } catch {

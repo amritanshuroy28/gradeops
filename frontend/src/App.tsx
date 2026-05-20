@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import UploadPortal from './components/UploadPortal';
 import ReviewDashboard from './components/ReviewDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import { API_BASE } from './config';
 
 type Role = 'instructor' | 'ta' | 'admin';
 
@@ -13,7 +14,7 @@ function App() {
   useEffect(() => {
     const health = async () => {
       try {
-        const res = await fetch('http://localhost:8000/health');
+        const res = await fetch(`${API_BASE}/health`);
         if (!res.ok) throw new Error('Backend unavailable');
         setBackendReady(true);
       } catch {

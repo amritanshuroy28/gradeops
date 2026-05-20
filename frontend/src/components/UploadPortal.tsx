@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type { DragEvent } from 'react';
+import { API_BASE } from '../config';
 
 interface FileEntry { file: File; status: 'idle' | 'uploading' | 'done' | 'error'; }
 
@@ -48,7 +49,7 @@ export default function UploadPortal() {
     setStatus({ type: 'info', message: 'Creating course, exam, and uploading submissions…' });
 
     try {
-      const BASE = 'http://localhost:8000';
+      const BASE = API_BASE;
       const rubricText = await rubricFile.text();
       let rubricData: any;
       try { rubricData = JSON.parse(rubricText); }
