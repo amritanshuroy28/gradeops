@@ -57,3 +57,9 @@ frontend/.env.local
 # Logs
 logs/
 *.log
+
+
+# Project Documentation / AI Prompts
+DESIGN.md
+SKILL.md
+
